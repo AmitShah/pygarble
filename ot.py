@@ -111,8 +111,6 @@ class Alice:
 
         G = []
         for i in range(len(self.M)):
-            print(compute_poly(f, i))
-            test = modpow(5,6,7)
             F = modpow(int(compute_poly(f, i)), self.privkey.d, self.pubkey.n)
             G.append(F * bytes_to_int(self.M[i]))
 
