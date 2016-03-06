@@ -11,7 +11,7 @@ def shuffle(l):
         l[i], l[j] = l[j], l[i]
 
 def keypair():
-    return [Fernet.generate_key(), Fernet.generate_key()]
+    return {0: Fernet.generate_key(), 1: Fernet.generate_key()}
 
 class Gate(object):
 
@@ -19,7 +19,8 @@ class Gate(object):
         return keypair()
 
     def grab_wires(self):
-        return [self.circuit.gates[x].outputs for x in self.inputs]
+        return {0: self.circuit.gates[self.inputs[0]].outputs,
+                1: self.circuit.gates[self.inputs[1]].outputs}
     
     gate_ref = {
         "AND": (lambda x, y: x and y),
@@ -39,7 +40,12 @@ class Gate(object):
 
         self.output = None
 
-        f = [[Fernet(key) for key in wire] for wire in wires]
+        f = {}
+        for i in (0, 1):
+            f[i] = {}
+            for j in (0, 1):
+                f[i][j] = Fernet(wires[i][j])
+
 
         for i in range(2):
             for j in range(2):
@@ -50,14 +56,16 @@ class Gate(object):
                     enc = f[0][i].encrypt(self.outputs[0])
                     self.table.append(f[1][j].encrypt(enc))
 
-        shuffle(self.table)
+        shuffle(self.table) # TODO: make this crypto secure
 
     def grab_inputs(self):
-        return [self.circuit.gates[g].fire() for g in self.inputs]
+        return {0: self.circuit.gates[self.inputs[0]].fire(),
+                1: self.circuit.gates[self.inputs[1]].fire()}
 
     def fire(self):
         if self.output is None:
             keys = self.grab_inputs()
+            print(self.g_id, keys, self.table)
 
             fs = [Fernet(keys[1]), Fernet(keys[0])]
 
@@ -83,13 +91,15 @@ class Gate(object):
 
 class OnInputGate(Gate):
     def grab_wires(self):
-        return [self.circuit.poss_inputs[x] for x in self.inputs]
+        return {0: self.circuit.poss_inputs[self.inputs[0]],
+                1: self.circuit.poss_inputs[self.inputs[1]]}
 
     def __init__(self, circuit, g_id, ctype, inputs):
         Gate.__init__(self, circuit, g_id, ctype, inputs)
 
     def grab_inputs(self):
-        return [self.circuit.inputs[i] for i in self.inputs]
+        return {0: self.circuit.inputs[self.inputs[0]],
+                1: self.circuit.inputs[self.inputs[1]]}
 
 class OutputGate(Gate):
     def keypair(self):
@@ -105,15 +115,15 @@ class Circuit(object):
         self.gates = {}
 
         for g in on_input_gates:
-            self.gates[g[0]] = OnInputGate(self, g[0], g[1], g[2])
+            self.gates[g[0]] = OnInputGate(self, g[0], g[1], {0: g[2][0], 1: g[2][1]})
 
         for g in mid_gates:
-            self.gates[g[0]] = Gate(self, g[0], g[1], g[2])
+            self.gates[g[0]] = Gate(self, g[0], g[1], {0: g[2][0], 1: g[2][1]})
 
         self.output_gate_ids = []
         for g in output_gates:
             self.output_gate_ids.append(g[0])
-            self.gates[g[0]] = OutputGate(self, g[0], g[1], g[2])
+            self.gates[g[0]] = OutputGate(self, g[0], g[1], {0: g[2][0], 1: g[2][1]})
 
     def fire(self, inputs):
         self.inputs = inputs
@@ -141,6 +151,7 @@ class Circuit(object):
 num_inputs = 2**13
 
 """
+from alice import *
 on_input_gates = [[0, "AND", [0, 1]], 
                 [1, "XOR", [2, 3]], 
                 [2, "OR", [0,3]]]
@@ -149,6 +160,9 @@ mid_gates = [[3, "XOR", [0, 1]],
              [4, "OR", [1, 2]]]
 
 output_gates = [[5, "OR", [3, 4]]]
+mycirc = Circuit(5, on_input_gates, mid_gates, output_gates)
+my_input = [x[y] for x, y in zip(mycirc.poss_inputs, [0, 1, 0, 1])]
+mycirc.fire(my_input)
 """
 
 on_input_gates = [[n, "AND", [n*2, n*2+1]] for n in range(num_inputs//2)]
