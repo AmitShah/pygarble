@@ -1,6 +1,14 @@
 from cryptography.fernet import Fernet
-import random
+from random import SystemRandom
 from profilehooks import profile
+
+cryptorand = SystemRandom()
+
+def shuffle(l):
+    for i in range(len(l)-1, 0, -1):
+        j = cryptorand.randrange(i+1)
+        l[i], l[j] = l[j], l[i]
+        
 
 def keypair():
     return [Fernet.generate_key(), Fernet.generate_key()]
@@ -42,7 +50,7 @@ class Gate(object):
                     enc = f[0][i].encrypt(self.outputs[0])
                     self.table.append(f[1][j].encrypt(enc))
 
-        random.shuffle(self.table)
+        shuffle(self.table)
 
     def grab_inputs(self):
         return [self.circuit.gates[g].fire() for g in self.inputs]
@@ -116,7 +124,7 @@ class Circuit(object):
 
         
 
-num_inputs = 2**15
+num_inputs = 2**12
 
 """
 on_input_gates = [[0, "AND", [0, 1]], 
@@ -144,6 +152,10 @@ def make_gen_adder(wires0, wires1, g_ids):
         gates.append(make_adder(wires0[i], wires1[i], g_ids[i]))
     return gates
 
+def make_voting_circuit(num_candidates, num_voters):
+    gates = []
+    bits_for_cand = ceil(log(num_candidates, 2))
+    bits_for_votr = ceil(log(num_voters, 2))
 
 
 

@@ -1,6 +1,14 @@
 from cryptography.fernet import Fernet
-import random
-import profilehooks
+from random import SystemRandom
+import json
+from custom_json import *
+
+cryptorand = SystemRandom()
+
+def shuffle(l):
+    for i in range(len(l)-1, 0, -1):
+        j = cryptorand.randrange(i+1)
+        l[i], l[j] = l[j], l[i]
 
 def keypair():
     return [Fernet.generate_key(), Fernet.generate_key()]
@@ -42,7 +50,7 @@ class Gate(object):
                     enc = f[0][i].encrypt(self.outputs[0])
                     self.table.append(f[1][j].encrypt(enc))
 
-        random.shuffle(self.table)
+        shuffle(self.table)
 
     def grab_inputs(self):
         return [self.circuit.gates[g].fire() for g in self.inputs]
@@ -90,9 +98,9 @@ class OutputGate(Gate):
     def __init__(self, circuit, g_id, ctype, inputs):
         Gate.__init__(self, circuit, g_id, ctype, inputs)
 
-@profile
 class Circuit(object):
     def __init__(self, num_inputs, on_input_gates, mid_gates, output_gates):
+        self.num_inputs = num_inputs
         self.poss_inputs = [keypair() for x in range(num_inputs)]
         self.gates = {}
 
@@ -107,7 +115,6 @@ class Circuit(object):
             self.output_gate_ids.append(g[0])
             self.gates[g[0]] = OutputGate(self, g[0], g[1], g[2])
 
-
     def fire(self, inputs):
         self.inputs = inputs
         output = {}
@@ -115,10 +122,25 @@ class Circuit(object):
             output[g_id] = self.gates[g_id].fire()
         return output
 
+    def prep_for_json(self):
+        j = {"num_inputs": self.num_inputs,
+                "on_input_gates": {},
+                "gates": {},
+                "output_gate_ids": self.output_gate_ids}
+        for g_id, gate in self.gates.items():
+            gate_json = {"table": gate.table, "inputs": gate.inputs}
+            if type(gate) is OnInputGate:
+                j["on_input_gates"][gate.g_id] = gate_json
+            else:
+                j["gates"][gate.g_id] = gate_json
+
+        return j
+
         
 
-num_inputs = 4
+num_inputs = 2**13
 
+"""
 on_input_gates = [[0, "AND", [0, 1]], 
                 [1, "XOR", [2, 3]], 
                 [2, "OR", [0,3]]]
@@ -127,13 +149,47 @@ mid_gates = [[3, "XOR", [0, 1]],
              [4, "OR", [1, 2]]]
 
 output_gates = [[5, "OR", [3, 4]]]
+"""
+
+on_input_gates = [[n, "AND", [n*2, n*2+1]] for n in range(num_inputs//2)]
+mid_gates = []
+
+def make_adder(w0, w1, g_ids):
+    gates = [[g_ids[0], "AND", [w0, w1]]
+             [g_ids[1], "XOR", [w0, w1]]]
+
+    return gates
+
+def make_gen_adder(wires0, wires1, g_ids):
+    gates = []
+    for i in range(len(wires0)):
+        gates.append(make_adder(wires0[i], wires1[i], g_ids[i]))
+    return gates
+
+def make_voting_circuit(num_candidates, num_voters):
+    gates = []
+    bits_for_cand = ceil(log(num_candidates, 2))
+    bits_for_votr = ceil(log(num_voters, 2))
+
+
+
+
+"""
+count = num_inputs//2
+m = num_inputs//4
+
+while m != 1:
+    mid_gates.extend([[n+count, "AND", [count-m*2+n*2, count-m*2+n*2+1]] for n in range(m)])
+    count += m
+    m = m//2
+
+output_gates = [[count, "AND", [count-2, count-1]]]
 
 
 mycirc = Circuit(num_inputs, on_input_gates, mid_gates, output_gates)
 
-my_inputs = [0, 1, 0, 1]
-my_enc_inputs = [mycirc.poss_inputs[x][my_inputs[x]] for x in range(num_inputs)]
+j = mycirc.prep_for_json()
 
-out = mycirc.fire(my_enc_inputs)
-
-print(out)
+with open('circuit.json', 'w') as outfile:
+    json.dump(j, outfile, default=custom_to_json, separators=(',', ':'))
+"""
