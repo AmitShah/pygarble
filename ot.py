@@ -6,6 +6,13 @@ from itertools import combinations
 from numpy import poly1d
 from json_stuff import *
 from random import SystemRandom
+from bigfloat import *
+from builtins import pow as modpow
+
+key_length = 44 # length of the keys (the messages Alice has) in bytes
+RSA_bits = 512
+prec = 600 # this should be larger than # of bits for RSA keys
+setcontext(precision(prec)) 
 
 def prod(x, G):
     p = 1
@@ -46,7 +53,7 @@ def lagrange(x, y, G):
             if j != i:
                 d = (d * (x[i] - x[j]))
 
-        partial = map(lambda q: (q * y[i] / d) % G, partial)
+        partial = map(lambda q: div(mul(q, y[i]),  d), partial)
         f = [(m + n) % G for m, n in zip(f, partial)] # also needs % G
     return f
 
@@ -58,10 +65,22 @@ def bytes_to_int(m):
 
     return sum(m)
 
+def int_to_bytes(i):
+    int_array = []
+    for x in range(RSA_bits//8 - 1, -1, -1):
+        b = floordiv(i, pow(256, x))
+        int_array.append(int(b))
+        i -= mul(b, pow(256, x))
+
+    return bytes(bytearray(int_array))
+
+def strip_padding(b):
+    return b[(RSA_bits//8 - key_length):]
+
 def compute_poly(f, x):
     y = 0
     for i in range(len(f)):
-        y += f[i] * x**(len(f) - 1 - i)
+        y += f[i] * pow(x, (len(f) - 1 - i))
     return y
 
 class Alice:
@@ -69,7 +88,7 @@ class Alice:
     def __init__(self, M):
         self.M = M
 
-        (pubkey, privkey) = rsa.newkeys(512)
+        (pubkey, privkey) = rsa.newkeys(RSA_bits)
         self.pubkey = pubkey
         self.privkey = privkey
 
@@ -87,13 +106,14 @@ class Alice:
 
     def transmit(self, file_name = "alice_dec.json", bob_file_name = "bob_setup.json"):
         bob = read_json(bob_file_name)
+        f = [BigFloat.exact(x, precision=prec) for x in bob]
         check_poly(bob)
-        f = bob
 
         G = []
         for i in range(len(self.M)):
             print(compute_poly(f, i))
-            F = pow(round(compute_poly(f, i)), self.privkey.d, self.pubkey.n)
+            test = modpow(5,6,7)
+            F = modpow(int(compute_poly(f, i)), self.privkey.d, self.pubkey.n)
             G.append(F * bytes_to_int(self.M[i]))
 
         write_json(file_name, G)
@@ -109,7 +129,6 @@ class Bob:
     def setup(self, file_name = "bob_setup.json", alice_file_name = "alice_setup.json"):
         alice = read_json(alice_file_name)
         self.pubkey = PublicKey(alice["pubkey"]["n"], alice["pubkey"]["e"])
-        print(self.pubkey)
         self.hashes = alice["hashes"]
 
         self.R = []
@@ -117,13 +136,14 @@ class Bob:
         for j in range(self.num_des_messages):
             r = randint(self.pubkey.n)
             self.R.append(r)
-            T.append(pow(r, self.pubkey.e, self.pubkey.n)) # the encrypted random value
+            T.append(modpow(r, self.pubkey.e, self.pubkey.n)) # the encrypted random value
 
-        print(self.pubkey.n)
         G = next_prime(self.pubkey.n)
         f = lagrange(self.des_messages, T, G)
 
-        write_json(file_name, f)
+        string_f = [str(x) for x in f]
+
+        write_json(file_name, string_f)
         print("Polynomial published.")
 
     def receive(self, alice_file_name = "alice_dec.json"):
@@ -132,22 +152,12 @@ class Bob:
 
         decrypted = []
         for j in range(self.num_des_messages):
-            d = (G[self.des_messages[j]] / self.R[j]) % self.pubkey.n
-            decrypted.append(int_to_bytes(d))
+            d = div(G[self.des_messages[j]], self.R[j]) % self.pubkey.n
+            dec_bytes = int_to_bytes(d)
+            decrypted.append(strip_padding(dec_bytes))
 
-            if hasher(decrypted[j]) != self.hashes[des_messages[j]]:
+            if hasher(decrypted[j]) != self.hashes[self.des_messages[j]]:
                 print("Hashes don't match. Either something messed up or Alice is up to something.")
 
         self.decrypted = decrypted
         return(decrypted)
-
-
-
-
-
-
-        
-
-
-
-
