@@ -72,7 +72,7 @@ def int_to_bytes(i):
         int_array.append(int(b))
         i -= mul(b, pow(256, x))
 
-    return bytes(bytearray(int_array))
+    return bytes(int_array)
 
 def strip_padding(b):
     return b[(RSA_bits//8 - key_length):]
