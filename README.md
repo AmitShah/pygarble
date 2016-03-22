@@ -1,6 +1,6 @@
-# garbled-voting
+# pygarble
 
-This is an implementation of secure multiparty computation using Yao's garbled circuits.
+This is an implementation of secure two party computation using Yao's garbled circuits.
 
 Alice creates the circuit, and Bob evaluates it.
 
@@ -40,7 +40,7 @@ We could now evulate the circuit from Alice's side using these keys. For example
 ```
 As we can see, `mycirc.fire` returns a dict with key corresponding the ID of each of the output gates (in this case just gate 5), and its output encoded as a byte. In this case, the output of the circuit was 1.
 
-We can then export the `Circruit` object to a dict for json with:
+We can then export the `Circuit` object to a dict for json with:
 ```
 > j = mycirc.prep_for_json()
 ```
@@ -113,8 +113,3 @@ We can see we have the key we asked for. If something goes wrong in transmission
 Hashes don't match. Either something messed up or Alice is up to something.
 [b'messed up hash key here']
 ```
-
-## TODO
-* Right now it's just Alice and Bob, need to make it work for multiple clients -> server model
-* Need to come up with a way to evaluate a vote with a boolean circuit
-
