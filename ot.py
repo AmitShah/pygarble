@@ -1,4 +1,3 @@
-from scipy import interpolate
 import rsa
 from rsa import PublicKey
 from hashlib import sha256
@@ -66,9 +65,10 @@ def bytes_to_int(m):
     return sum(m)
 
 def int_to_bytes(i):
+    print(type(i))
     int_array = []
     for x in range(RSA_bits//8 - 1, -1, -1):
-        b = floordiv(i, pow(256, x))
+        b = floor(div(i, pow(256, x)))
         int_array.append(int(b))
         i -= mul(b, pow(256, x))
 
@@ -119,8 +119,7 @@ class Alice:
 
 class Bob:
 
-    def __init__(self, num_messages, num_des_messages, des_messages):
-        self.num_messages = num_messages
+    def __init__(self, num_des_messages, des_messages):
         self.num_des_messages = num_des_messages
         self.des_messages = des_messages
 
